@@ -18,7 +18,12 @@ app.get("/", (c) =>
           <form action="/extend">
             <label>
               延長したい URL を入力<br />
-              <input type="text" name="url" style="width: 20em; height: 2em" />
+              <input
+                type="text"
+                value="https://"
+                name="url"
+                style="width: 20em; height: 2em"
+              />
             </label>
             <input type="submit" value="延長！" />
           </form>

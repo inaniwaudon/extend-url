@@ -1,4 +1,4 @@
-// See at https://publicsuffix.org/list/
+// cf. https://publicsuffix.org/list/
 export const domainSuffixes = [
   "ac",
   "com.ac",

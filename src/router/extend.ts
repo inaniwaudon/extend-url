@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { APP_URL, footer, getError, head } from "./utills";
 import { getPageTitle } from "../page";
+import { sha256 } from "../utils";
 import { getDomain, whois } from "../whois";
 
 const app = new Hono();
@@ -13,6 +14,8 @@ const extendSchema = z.object({
   url: z.string(),
   title: z.string().optional(),
   organization: z.string().optional(),
+  timestamp: z.string().optional(),
+  hash: z.string().optional(),
 });
 
 app.get(
@@ -27,6 +30,8 @@ app.get(
       url: queryUrl,
       title: queryTitle,
       organization: queryOrganization,
+      timestamp: queryTimestamp,
+      hash: queryHash,
     } = c.req.valid("query");
 
     let url: URL;
@@ -48,7 +53,10 @@ app.get(
         return c.html(getError("URL が存在しません（404）"), 404);
       }
       if (pageTitleResult.errorType === "network") {
-        return c.html(getError("ネットワークエラーです"), 500);
+        return c.html(
+          getError("ネットワークエラーです. URL は正しいですか？"),
+          500
+        );
       }
       return c.html(getError("内部エラーです. ドメインは正しいですか？"), 500);
     }
@@ -66,18 +74,34 @@ app.get(
 
     const organization = whoisResult.result.organization ?? "不明";
 
+    // タイムスタンプが欠如していた場合は更新
+    const timestamp = queryTimestamp ? queryTimestamp : Date.now().toString();
+
+    // ハッシュ値を計算
+    const hash = await sha256(
+      `${url}::${pageTitle}::${organization}::${timestamp}`
+    );
+
+    // クエリのいずれかが欠如していた場合はリダイレクト
     const extendedUrl = `${APP_URL}/extend?url=${url}&title=${encodeURIComponent(
       pageTitle
-    )}&organization=${encodeURIComponent(organization)}`;
+    )}&organization=${encodeURIComponent(
+      organization
+    )}&timestamp=${timestamp}&hash=${hash}`;
 
-    // クエリのタイトルまたは所有者が欠如していた場合はリダイレクト
-    if (!queryTitle || !queryOrganization) {
+    if (!queryTitle || !queryOrganization || !queryTimestamp || !queryHash) {
       return c.redirect(extendedUrl);
     }
 
     // 不正なパラメータが指定された場合は、改竄されている旨を表示
-    if (queryTitle !== pageTitle || queryOrganization !== organization) {
-      return c.html(getError("改竄された URL です"));
+    if (queryTitle !== pageTitle) {
+      return c.html(getError("クエリ中のページタイトルが改竄されています"));
+    }
+    if (queryOrganization !== organization) {
+      return c.html(getError("クエリ中のドメイン所有者が改竄されています"));
+    }
+    if (queryHash !== hash) {
+      return c.html(getError("クエリ中のハッシュ値が改竄されています"));
     }
 
     return c.html(
@@ -93,11 +117,13 @@ app.get(
               <a href="${url}">このサイトに遷移する</a>
             </p>
             延長された URL<br />
+            <textarea readonly rows="5" style="width: 80vw;">
+${extendedUrl}</textarea
+            >
             <input
-              type="${url}"
-              readonly
-              value=${extendedUrl}
-              style="width: 20em; height: 2em"
+              type="button"
+              value="コピー"
+              onClick="javascript:navigator.clipboard.writeText('${extendedUrl}')"
             />
 
             <h2>各種情報</h2>
@@ -106,6 +132,10 @@ app.get(
               <dd>${pageTitle}</dd>
               <dt>${domain} の所有者</dt>
               <dd>${organization}</dd>
+              <dt>タイムスタンプ</dt>
+              <dd>${timestamp}</dd>
+              <dt>ハッシュ値</dt>
+              <dd>${hash}</dd>
             </dl>
 
             ${footer}

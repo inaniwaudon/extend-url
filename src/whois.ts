@@ -34,15 +34,11 @@ const supportsTld = (tld: string): tld is Tld =>
 
 // Whois サーバに TCP で接続
 const connectWhoisServer = async (host: string, whoisHost: string) => {
-  const address: SocketAddress = {
-    hostname: whoisHost,
-    port: 43,
-  };
-  const socket = connect(address);
+  const socket = connect(`${whoisHost}:43`);
 
   const writer = socket.writable.getWriter();
   const encoder = new TextEncoder();
-  const encoded = encoder.encode(host + "\n");
+  const encoded = encoder.encode(host + "\r\n");
   await writer.write(encoded);
 
   const decoder = new TextDecoder();
@@ -57,7 +53,6 @@ const connectWhoisServer = async (host: string, whoisHost: string) => {
     }
   }
 
-  socket.close();
   return response;
 };
 
@@ -110,7 +105,14 @@ export const whois = async (
   }
 
   try {
-    const response = await connectWhoisServer(host, whoisHost);
+    let response = "";
+    for (let i = 0; i < 3; i++) {
+      response = await connectWhoisServer(host, whoisHost);
+      if (response !== "") {
+        break;
+      }
+    }
+    // 失敗した場合は再試行
     const parsed = parseWhois(response, tld);
 
     // registrarWhois が指定された場合は再帰的に問い合わせ
