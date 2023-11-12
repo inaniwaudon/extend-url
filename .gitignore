@@ -1,0 +1,4 @@
+node_modules
+.wrangler
+yarn-error.log
+wrangler.toml
