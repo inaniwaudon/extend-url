@@ -3,9 +3,7 @@ import { domainSuffixes } from "./domain";
 import { Result } from "./utils";
 
 const minnaTld = "xn--q9jyb4c" as const;
-
 const tldList = ["jp", "com", "org", "dev", "io", minnaTld] as const;
-
 type Tld = (typeof tldList)[number];
 
 const googleWhoisHost = "whois.nic.google";
@@ -105,6 +103,7 @@ export const whois = async (
   }
 
   try {
+    // 失敗した場合は再試行
     let response = "";
     for (let i = 0; i < 3; i++) {
       response = await connectWhoisServer(host, whoisHost);
@@ -112,7 +111,6 @@ export const whois = async (
         break;
       }
     }
-    // 失敗した場合は再試行
     const parsed = parseWhois(response, tld);
 
     // registrarWhois が指定された場合は再帰的に問い合わせ
